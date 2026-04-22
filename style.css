@@ -1,0 +1,29 @@
+body {
+    font-family: monospace;
+    background: #f4f1e8;
+    padding: 20px;
+}
+
+h1,
+h2 {
+    margin-bottom: 10px;
+}
+
+div {
+    margin-bottom: 16px;
+}
+
+button {
+    margin-right: 6px;
+    margin-bottom: 6px;
+    padding: 6px 10px;
+    border: 2px solid #222;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 #222;
+}
+
+button:active {
+    transform: translate(2px, 2px);
+    box-shadow: none;
+}
