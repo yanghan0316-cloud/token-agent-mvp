@@ -1,29 +1,232 @@
+* {
+    box-sizing: border-box;
+}
+
 body {
-    font-family: monospace;
-    background: #f4f1e8;
-    padding: 20px;
+    margin: 0;
+    font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    background:
+        radial-gradient(circle at top, #fff4cf 0%, #f4ecda 40%, #eadfc7 100%);
+    color: #2e261d;
+    padding: 24px;
 }
 
 h1,
-h2 {
+h2,
+p {
+    margin-top: 0;
+}
+
+h1 {
+    margin-bottom: 20px;
+}
+
+.panel {
+    background: rgba(255, 250, 240, 0.92);
+    border: 2px solid #3a2c20;
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 18px;
+    box-shadow: 6px 6px 0 rgba(58, 44, 32, 0.14);
+}
+
+.panel-highlight {
+    background: linear-gradient(135deg, #fff8d9 0%, #fff2c1 100%);
+}
+
+.stats-grid,
+.task-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.stat-card,
+.task-card,
+.agent-card {
+    background: #fffdf6;
+    border: 2px solid #3a2c20;
+    border-radius: 14px;
+    padding: 14px;
+}
+
+.stat-label {
+    display: block;
+    font-size: 13px;
+    color: #6a5a48;
+    margin-bottom: 6px;
+}
+
+.stat-value {
+    font-size: 26px;
+}
+
+.notice {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 2px solid transparent;
+}
+
+.notice p,
+.agent-card p,
+.task-card p {
+    margin-bottom: 8px;
+}
+
+.notice-label {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.notice-info {
+    background: #edf5ff;
+    border-color: #5a8bd6;
+}
+
+.notice-success {
+    background: #ecfff2;
+    border-color: #4ca66a;
+}
+
+.notice-warning {
+    background: #fff7e8;
+    border-color: #cc8a2e;
+}
+
+.notice-error {
+    background: #fff0f0;
+    border-color: #c85a5a;
+}
+
+.agent-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.agent-working {
+    background: #fdf6e5;
+}
+
+.agent-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     margin-bottom: 10px;
 }
 
-div {
-    margin-bottom: 16px;
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 60px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.badge-idle {
+    background: #ece7dd;
+    color: #5c4f40;
+}
+
+.badge-working {
+    background: #ffe39e;
+    color: #6b4a00;
+}
+
+.progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 14px;
+}
+
+.progress-hidden {
+    visibility: hidden;
+    min-height: 18px;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 12px;
+    border-radius: 999px;
+    border: 2px solid #3a2c20;
+    background: #f2ebde;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f6b73c 0%, #e08b1d 100%);
+    transition: width 0.25s ease;
+}
+
+.progress-text {
+    min-width: 42px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+}
+
+.button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 button {
-    margin-right: 6px;
-    margin-bottom: 6px;
-    padding: 6px 10px;
-    border: 2px solid #222;
+    padding: 8px 12px;
+    border: 2px solid #2f241b;
+    border-radius: 10px;
     background: #fff;
+    color: #2e261d;
     cursor: pointer;
-    box-shadow: 2px 2px 0 #222;
+    box-shadow: 2px 2px 0 #2f241b;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
 
-button:active {
-    transform: translate(2px, 2px);
+button:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 #2f241b;
+}
+
+button:active:not(:disabled) {
+    transform: translate(1px, 1px);
     box-shadow: none;
+}
+
+button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.log-list {
+    padding-left: 18px;
+    margin-bottom: 0;
+}
+
+.log-list li {
+    margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+    body {
+        padding: 16px;
+    }
+
+    .panel {
+        padding: 14px;
+    }
+
+    .agent-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 }
