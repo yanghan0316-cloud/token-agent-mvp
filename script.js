@@ -1,7 +1,7 @@
+const RENT_DURATION_SECONDS = 30;
+
 const player = {
     token: 100,
-    ownedAgents: [],
-    rentedAgents: [],
     logs: [],
     notice: {
         type: "info",
@@ -32,7 +32,8 @@ const agents = [
         owned: false,
         rented: false,
         currentTaskId: null,
-        taskEndsAt: null
+        taskEndsAt: null,
+        rentEndsAt: null
     },
     {
         id: 2,
@@ -45,7 +46,8 @@ const agents = [
         owned: false,
         rented: false,
         currentTaskId: null,
-        taskEndsAt: null
+        taskEndsAt: null,
+        rentEndsAt: null
     },
     {
         id: 3,
@@ -58,7 +60,8 @@ const agents = [
         owned: false,
         rented: false,
         currentTaskId: null,
-        taskEndsAt: null
+        taskEndsAt: null,
+        rentEndsAt: null
     }
 ];
 
@@ -89,7 +92,7 @@ const tasks = [
     }
 ];
 
-let progressTimer = null;
+let uiTimer = null;
 
 function setNotice(type, text) {
     player.notice = { type, text };
@@ -100,6 +103,18 @@ function addLog(text) {
         hour12: false
     });
     player.logs.push(`[${time}] ${text}`);
+}
+
+function getOwnedAgents() {
+    return agents.filter(agent => agent.owned);
+}
+
+function getRentedAgents() {
+    return agents.filter(agent => agent.rented);
+}
+
+function getWorkingAgents() {
+    return agents.filter(agent => agent.status === "working");
 }
 
 function getAgentOwnershipLabel(agent) {
@@ -116,11 +131,19 @@ function getAgentCurrentTask(agent) {
     return tasks.find(task => task.id === agent.currentTaskId) || null;
 }
 
-function getRemainingSeconds(agent) {
-    if (!agent.taskEndsAt) {
+function getRemainingSeconds(endTime) {
+    if (!endTime) {
         return 0;
     }
-    return Math.max(0, Math.ceil((agent.taskEndsAt - Date.now()) / 1000));
+    return Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+}
+
+function getTaskRemainingSeconds(agent) {
+    return getRemainingSeconds(agent.taskEndsAt);
+}
+
+function getRentRemainingSeconds(agent) {
+    return getRemainingSeconds(agent.rentEndsAt);
 }
 
 function getTaskProgress(agent) {
@@ -129,22 +152,44 @@ function getTaskProgress(agent) {
         return 0;
     }
 
-    const elapsed = task.duration - getRemainingSeconds(agent);
+    const elapsed = task.duration - getTaskRemainingSeconds(agent);
     return Math.min(100, Math.max(0, Math.round((elapsed / task.duration) * 100)));
 }
 
-function ensureProgressTimer() {
-    const hasActiveTask = agents.some(agent => agent.status === "working");
+function releaseExpiredRentals() {
+    const expiredAgents = agents.filter(agent => agent.rented && getRentRemainingSeconds(agent) === 0);
 
-    if (hasActiveTask && !progressTimer) {
-        progressTimer = setInterval(() => {
+    expiredAgents.forEach(agent => {
+        agent.rented = false;
+        agent.rentEndsAt = null;
+
+        if (agent.status === "working") {
+            agent.status = "idle";
+            agent.currentTaskId = null;
+            agent.taskEndsAt = null;
+        }
+
+        addLog(`Rental expired for ${agent.name}.`);
+    });
+
+    if (expiredAgents.length > 0) {
+        setNotice("warning", `${expiredAgents.map(agent => agent.name).join(", ")} rental expired.`);
+    }
+}
+
+function ensureUiTimer() {
+    const hasTimedState = agents.some(agent => agent.status === "working" || agent.rented);
+
+    if (hasTimedState && !uiTimer) {
+        uiTimer = setInterval(() => {
+            releaseExpiredRentals();
             render();
         }, 1000);
     }
 
-    if (!hasActiveTask && progressTimer) {
-        clearInterval(progressTimer);
-        progressTimer = null;
+    if (!hasTimedState && uiTimer) {
+        clearInterval(uiTimer);
+        uiTimer = null;
     }
 }
 
@@ -164,12 +209,11 @@ function buyAgent(agentId) {
     player.token -= agent.buyPrice;
     agent.owned = true;
     agent.rented = false;
-    if (!player.ownedAgents.includes(agent.id)) {
-        player.ownedAgents.push(agent.id);
-    }
+    agent.rentEndsAt = null;
 
     setNotice("success", `${agent.name} purchased for ${agent.buyPrice} Token.`);
     addLog(`Bought ${agent.name} for ${agent.buyPrice} Token.`);
+    ensureUiTimer();
     render();
 }
 
@@ -188,12 +232,11 @@ function rentAgent(agentId) {
 
     player.token -= agent.rentPrice;
     agent.rented = true;
-    if (!player.rentedAgents.includes(agent.id)) {
-        player.rentedAgents.push(agent.id);
-    }
+    agent.rentEndsAt = Date.now() + RENT_DURATION_SECONDS * 1000;
 
-    setNotice("success", `${agent.name} rented for ${agent.rentPrice} Token.`);
-    addLog(`Rented ${agent.name} for ${agent.rentPrice} Token.`);
+    setNotice("success", `${agent.name} rented for ${agent.rentPrice} Token for ${RENT_DURATION_SECONDS}s.`);
+    addLog(`Rented ${agent.name} for ${agent.rentPrice} Token. Duration: ${RENT_DURATION_SECONDS}s.`);
+    ensureUiTimer();
     render();
 }
 
@@ -232,16 +275,29 @@ function startTask(agentId, taskId) {
         return;
     }
 
+    if (agent.rented && getRentRemainingSeconds(agent) < task.duration) {
+        setNotice("error", `${agent.name} rental expires before "${task.name}" can finish.`);
+        addLog(`Task start failed: ${agent.name} has only ${getRentRemainingSeconds(agent)}s rental time left.`);
+        render();
+        return;
+    }
+
     agent.status = "working";
     agent.currentTaskId = task.id;
     agent.taskEndsAt = Date.now() + task.duration * 1000;
 
     setNotice("info", `${agent.name} started "${task.name}". ETA: ${task.duration}s.`);
     addLog(`${agent.name} started task: ${task.name}.`);
-    ensureProgressTimer();
+    ensureUiTimer();
     render();
 
     setTimeout(() => {
+        if (agent.status !== "working" || agent.currentTaskId !== task.id) {
+            ensureUiTimer();
+            render();
+            return;
+        }
+
         const reward = calculateReward(agent, task);
         player.token += reward;
         agent.status = "idle";
@@ -250,15 +306,17 @@ function startTask(agentId, taskId) {
 
         setNotice("success", `${agent.name} finished "${task.name}" and earned ${reward} Token.`);
         addLog(`${agent.name} completed ${task.name} and earned ${reward} Token.`);
-        ensureProgressTimer();
+        ensureUiTimer();
         render();
     }, task.duration * 1000);
 }
 
-function render() {
-    const workingCount = agents.filter(agent => agent.status === "working").length;
+function renderStatsPanel() {
+    const ownedCount = getOwnedAgents().length;
+    const rentedCount = getRentedAgents().length;
+    const workingCount = getWorkingAgents().length;
 
-    document.getElementById("token-panel").innerHTML = `
+    return `
     <section class="panel panel-highlight">
       <h2>Account Status</h2>
       <div class="stats-grid">
@@ -268,11 +326,11 @@ function render() {
         </div>
         <div class="stat-card">
           <span class="stat-label">Owned Agents</span>
-          <strong class="stat-value">${player.ownedAgents.length}</strong>
+          <strong class="stat-value">${ownedCount}</strong>
         </div>
         <div class="stat-card">
           <span class="stat-label">Rented Agents</span>
-          <strong class="stat-value">${player.rentedAgents.length}</strong>
+          <strong class="stat-value">${rentedCount}</strong>
         </div>
         <div class="stat-card">
           <span class="stat-label">Active Tasks</span>
@@ -285,57 +343,81 @@ function render() {
       </div>
     </section>
   `;
+}
 
-    document.getElementById("agent-panel").innerHTML = `
+function renderAgentTaskText(agent, isWorking, canUse) {
+    if (isWorking) {
+        const currentTask = getAgentCurrentTask(agent);
+        return `Current task: ${currentTask.name}, ${getTaskRemainingSeconds(agent)}s remaining`;
+    }
+
+    if (canUse) {
+        return "Current task: none, ready for assignment.";
+    }
+
+    return "Current task: unavailable until unlocked.";
+}
+
+function renderAgentRentalText(agent) {
+    if (agent.owned) {
+        return "Ownership term: permanent.";
+    }
+
+    if (agent.rented) {
+        return `Rental time left: ${getRentRemainingSeconds(agent)}s`;
+    }
+
+    return `Rental term: ${RENT_DURATION_SECONDS}s`;
+}
+
+function renderAgentCard(agent) {
+    const canUse = agent.owned || agent.rented;
+    const isWorking = agent.status === "working";
+    const progress = getTaskProgress(agent);
+
+    return `
+      <article class="agent-card ${isWorking ? "agent-working" : ""}">
+        <div class="agent-header">
+          <strong>${agent.name}</strong>
+          <span class="badge badge-${isWorking ? "working" : "idle"}">${statusLabels[agent.status]}</span>
+        </div>
+        <p>Ownership: ${getAgentOwnershipLabel(agent)}</p>
+        <p>Specialty: ${specialtyLabels[agent.specialty]} | Bonus: x${agent.bonus}</p>
+        <p>Buy: ${agent.buyPrice} Token | Rent: ${agent.rentPrice} Token</p>
+        <p>${renderAgentRentalText(agent)}</p>
+        <p class="agent-task-text">${renderAgentTaskText(agent, isWorking, canUse)}</p>
+        <div class="progress-wrap ${isWorking ? "" : "progress-hidden"}">
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${progress}%"></div>
+          </div>
+          <span class="progress-text">${progress}%</span>
+        </div>
+        <div class="button-row">
+          <button onclick="buyAgent(${agent.id})" ${agent.owned ? "disabled" : ""}>Buy</button>
+          <button onclick="rentAgent(${agent.id})" ${(agent.owned || agent.rented) ? "disabled" : ""}>Rent</button>
+          ${tasks.map(task => `
+            <button onclick="startTask(${agent.id}, ${task.id})" ${(!canUse || isWorking) ? "disabled" : ""}>
+              ${task.name}
+            </button>
+          `).join("")}
+        </div>
+      </article>
+    `;
+}
+
+function renderAgentPanel() {
+    return `
     <section class="panel">
       <h2>Agent List</h2>
       <div class="agent-list">
-        ${agents.map(agent => {
-            const currentTask = getAgentCurrentTask(agent);
-            const remaining = getRemainingSeconds(agent);
-            const progress = getTaskProgress(agent);
-            const canUse = agent.owned || agent.rented;
-            const isWorking = agent.status === "working";
-
-            return `
-            <article class="agent-card ${isWorking ? "agent-working" : ""}">
-              <div class="agent-header">
-                <strong>${agent.name}</strong>
-                <span class="badge badge-${isWorking ? "working" : "idle"}">${statusLabels[agent.status]}</span>
-              </div>
-              <p>Ownership: ${getAgentOwnershipLabel(agent)}</p>
-              <p>Specialty: ${specialtyLabels[agent.specialty]} | Bonus: x${agent.bonus}</p>
-              <p>Buy: ${agent.buyPrice} Token | Rent: ${agent.rentPrice} Token</p>
-              <p class="agent-task-text">
-                ${isWorking
-                    ? `Current task: ${currentTask.name}, ${remaining}s remaining`
-                    : canUse
-                        ? "Current task: none, ready for assignment."
-                        : "Current task: unavailable until unlocked."}
-              </p>
-              <div class="progress-wrap ${isWorking ? "" : "progress-hidden"}">
-                <div class="progress-bar">
-                  <div class="progress-fill" style="width: ${progress}%"></div>
-                </div>
-                <span class="progress-text">${progress}%</span>
-              </div>
-              <div class="button-row">
-                <button onclick="buyAgent(${agent.id})" ${agent.owned ? "disabled" : ""}>Buy</button>
-                <button onclick="rentAgent(${agent.id})" ${(agent.owned || agent.rented) ? "disabled" : ""}>Rent</button>
-                ${tasks.map(task => `
-                  <button onclick="startTask(${agent.id}, ${task.id})" ${(!canUse || isWorking) ? "disabled" : ""}>
-                    ${task.name}
-                  </button>
-                `).join("")}
-              </div>
-            </article>
-          `;
-        }).join("")}
+        ${agents.map(renderAgentCard).join("")}
       </div>
     </section>
   `;
+}
 
-    document.getElementById("task-panel").innerHTML = `
+function renderTaskPanel() {
+    return `
     <section class="panel">
       <h2>Task Overview</h2>
       <div class="task-list">
@@ -350,8 +432,10 @@ function render() {
       </div>
     </section>
   `;
+}
 
-    document.getElementById("log-panel").innerHTML = `
+function renderLogPanel() {
+    return `
     <section class="panel">
       <h2>Activity Log</h2>
       <ul class="log-list">
@@ -361,6 +445,13 @@ function render() {
       </ul>
     </section>
   `;
+}
+
+function render() {
+    document.getElementById("token-panel").innerHTML = renderStatsPanel();
+    document.getElementById("agent-panel").innerHTML = renderAgentPanel();
+    document.getElementById("task-panel").innerHTML = renderTaskPanel();
+    document.getElementById("log-panel").innerHTML = renderLogPanel();
 }
 
 render();
