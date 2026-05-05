@@ -21,6 +21,38 @@ h1 {
     margin-bottom: 20px;
 }
 
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.app-header h1 {
+    margin-bottom: 0;
+}
+
+.language-switch {
+    display: inline-flex;
+    gap: 8px;
+    padding: 6px;
+    border: 2px solid #3a2c20;
+    border-radius: 12px;
+    background: rgba(255, 250, 240, 0.9);
+}
+
+.language-switch button {
+    min-width: 58px;
+    box-shadow: none;
+}
+
+.language-switch button.active {
+    background: #2f241b;
+    color: #fffdf6;
+}
+
 .panel {
     background: rgba(255, 250, 240, 0.92);
     border: 2px solid #3a2c20;
@@ -38,6 +70,7 @@ h1 {
 .task-list,
 .market-list,
 .offer-list,
+.guide-list,
 .form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -49,7 +82,8 @@ h1 {
 .agent-card,
 .create-card,
 .market-card,
-.offer-card {
+.offer-card,
+.guide-card {
     background: #fffdf6;
     border: 2px solid #3a2c20;
     border-radius: 14px;
@@ -88,7 +122,8 @@ h1 {
 .task-card p,
 .create-card p,
 .market-card p,
-.offer-card p {
+.offer-card p,
+.guide-card p {
     margin-bottom: 8px;
 }
 
@@ -126,7 +161,8 @@ h1 {
 }
 
 .market-list,
-.offer-list {
+.offer-list,
+.guide-list {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
@@ -308,6 +344,10 @@ button:disabled {
     }
 
     .panel-header {
+        align-items: flex-start;
+    }
+
+    .app-header {
         align-items: flex-start;
     }
 
