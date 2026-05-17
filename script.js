@@ -568,6 +568,51 @@ function captureUiState() {
     });
 }
 
+function getFocusedControlState() {
+    const activeElement = document.activeElement;
+    if (!activeElement || !activeElement.id || !["INPUT", "SELECT"].includes(activeElement.tagName)) {
+        return null;
+    }
+
+    const focusState = {
+        id: activeElement.id,
+        selectionStart: null,
+        selectionEnd: null
+    };
+
+    try {
+        focusState.selectionStart = activeElement.selectionStart;
+        focusState.selectionEnd = activeElement.selectionEnd;
+    } catch (error) {
+        // Some input types, such as number, do not expose text selection.
+    }
+
+    return focusState;
+}
+
+function restoreFocusedControl(focusState) {
+    if (!focusState) {
+        return;
+    }
+
+    const element = document.getElementById(focusState.id);
+    if (!element || element.disabled) {
+        return;
+    }
+
+    element.focus();
+
+    if (focusState.selectionStart === null || focusState.selectionEnd === null) {
+        return;
+    }
+
+    try {
+        element.setSelectionRange(focusState.selectionStart, focusState.selectionEnd);
+    } catch (error) {
+        // Some input types, such as number, cannot restore a selection range.
+    }
+}
+
 function isValidSpecialty(type) {
     return Object.prototype.hasOwnProperty.call(specialtyLabels, type);
 }
@@ -1394,14 +1439,14 @@ function renderMarketCard(agent) {
           <div class="form-field">
             <label for="sale-price-${agent.id}">${text().labels.salePrice}</label>
             <div class="input-row">
-              <input id="sale-price-${agent.id}" data-sale-price-for="${agent.id}" type="number" min="1" step="1" value="${escapeHtml(saleValue)}" />
+              <input id="sale-price-${agent.id}" data-sale-price-for="${agent.id}" type="number" min="1" step="1" value="${escapeHtml(saleValue)}" ${listingLocked ? "disabled" : ""} />
               <button onclick="handleListAgentForSale(${agent.id})" ${listingLocked ? "disabled" : ""}>${text().actions.listForSale}</button>
             </div>
           </div>
           <div class="form-field">
             <label for="rent-price-${agent.id}">${text().labels.rentPrice}</label>
             <div class="input-row">
-              <input id="rent-price-${agent.id}" data-rent-price-for="${agent.id}" type="number" min="1" step="1" value="${escapeHtml(rentValue)}" />
+              <input id="rent-price-${agent.id}" data-rent-price-for="${agent.id}" type="number" min="1" step="1" value="${escapeHtml(rentValue)}" ${listingLocked ? "disabled" : ""} />
               <button onclick="handleListAgentForRent(${agent.id})" ${listingLocked ? "disabled" : ""}>${text().actions.listForRent}</button>
             </div>
           </div>
@@ -1502,6 +1547,8 @@ function renderLogPanel() {
 }
 
 function render(shouldCaptureUiState = true, options = {}) {
+    const focusedControlState = getFocusedControlState();
+
     if (shouldCaptureUiState) {
         captureUiState();
     }
@@ -1521,6 +1568,8 @@ function render(shouldCaptureUiState = true, options = {}) {
     document.getElementById("offer-panel").innerHTML = renderOfferPanel();
     document.getElementById("task-panel").innerHTML = renderTaskPanel();
     document.getElementById("log-panel").innerHTML = renderLogPanel();
+
+    restoreFocusedControl(focusedControlState);
 }
 
 render();
